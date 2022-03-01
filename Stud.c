@@ -17,10 +17,14 @@ float time_wait = 2000.0;
 
 bool A_ackWasRecived = true;
 
+//#define PRINT_RUNNING_FUNCTIONS
+
 // debug print
 void p(char * str)
 {
+#ifdef PRINT_RUNNING_FUNCTIONS
     printf("%s\n", str);
+#endif
 }
 
 int calcChecksum(struct pkt packet)
@@ -41,9 +45,14 @@ int calcChecksum(struct pkt packet)
 struct pkt addChecksum(struct pkt packet){packet.checksum = calcChecksum(packet); return packet;}
 bool testCheckSum(struct pkt packet){return packet.checksum == calcChecksum(packet);}
 
+bool A_is_sending = false;
+
 /* called from layer 5, passed the data to be sent to other side */
 void A_output( struct msg message)
 {
+    if (A_is_sending) {printf("Skipping packet\n"); return;};
+    A_is_sending = true;
+    
     p("\nA_output()");
     struct pkt packet;
     packet.acknum = 0;
@@ -52,7 +61,7 @@ void A_output( struct msg message)
 
     packet = addChecksum(packet);
     
-    p("A creating and sending packet");
+    printf("A creating and sending packet\n");
     printf("current seq: %d, (%d)\n", packet.seqnum, A_ackWasRecived);
     tolayer3(A, packet);  
     A_prev_sent = packet;
@@ -81,6 +90,7 @@ void A_input(struct pkt packet)
             {
                 stoptimer(A);
                 A_ackWasRecived = true;
+                A_is_sending = false;
                 iA_fully_sent++;
             }
             else
@@ -127,8 +137,6 @@ void A_init()
 void B_input(struct pkt packet)
 {
     // Receive from A
-    //
-    // TODO: positive/negative ACK
     p("\nB_input()");
     if (testCheckSum(packet))
     {
